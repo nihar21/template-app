@@ -1,0 +1,37 @@
+{
+  "name": "api",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "scripts": {
+    "dev": "tsx watch --env-file=.env src/index.ts",
+    "build": "tsc -p tsconfig.json",
+    "postbuild": "node scripts/copy-assets.mjs",
+    "start": "node dist/index.js",
+    "lint": "eslint .",
+    "format": "prettier --write .",
+    "test": "vitest run",
+    "docker-build": "docker build -t templateapp-api .",
+    "docker-run": "docker run --rm -p 4000:4000 templateapp-api"
+  },
+  "dependencies": {
+    "@apollo/server": "^4.11.0",
+    "@graphql-tools/load-files": "^7.0.1",
+    "@graphql-tools/merge": "^9.1.8",
+    "cors": "^2.8.5",
+    "express": "^4.21.1",
+    "graphql": "^16.9.0"
+  },
+  "devDependencies": {
+    "@eslint/js": "^9.14.0",
+    "@types/cors": "^2.8.17",
+    "@types/express": "^4.17.21",
+    "@types/node": "^22.9.0",
+    "eslint": "^9.14.0",
+    "prettier": "^3.3.3",
+    "tsx": "^4.19.2",
+    "typescript": "^5.6.3",
+    "typescript-eslint": "^8.14.0",
+    "vitest": "^2.1.4"
+  }
+}
