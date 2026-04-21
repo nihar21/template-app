@@ -103,11 +103,14 @@ function parsePrincipal(header: string): AuthContext | null {
   };
 }
 
-export const authMiddleware: RequestHandler = (req, _res, next) => {
+export const authMiddleware: RequestHandler = (req, res, next) => {
   const header = req.header('x-ms-client-principal');
   if (header) {
     const parsed = parsePrincipal(header);
     req.authContext = parsed ?? MOCK_AUTH;
+  } else if (process.env.NODE_ENV === 'production') {
+    res.status(401).json({ error: 'unauthorized' });
+    return;
   } else {
     req.authContext = MOCK_AUTH;
   }
