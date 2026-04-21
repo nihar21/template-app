@@ -22,7 +22,7 @@ const server = new ApolloServer<Context>({ typeDefs, resolvers });
 await server.start();
 
 app.use(
-  '/graphql',
+  '/api/graphql',
   cors(),
   express.json(),
   authMiddleware,
@@ -37,5 +37,5 @@ app.get('/health', (_req, res) => {
 
 const port = Number(process.env.PORT) || 4000;
 app.listen(port, () => {
-  console.log(`api ready on :${port}/graphql`);
+  console.log(`api ready on :${port}/api/graphql`);
 });
