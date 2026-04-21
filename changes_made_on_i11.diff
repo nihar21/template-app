@@ -1,0 +1,251 @@
+diff --git a/.github/workflows/azure-static-web-apps-nice-beach-04d8a7a10.yml b/.github/workflows/azure-static-web-apps-nice-beach-04d8a7a10.yml
+new file mode 100644
+index 0000000..47deb95
+--- /dev/null
++++ b/.github/workflows/azure-static-web-apps-nice-beach-04d8a7a10.yml
+@@ -0,0 +1,59 @@
++name: Azure Static Web Apps CI/CD
++
++on:
++  workflow_dispatch:
++  push:
++    branches:
++      - main
++  pull_request:
++    types: [opened, synchronize, reopened, closed]
++    branches:
++      - main
++
++jobs:
++  build_and_deploy_job:
++    if: github.event_name == 'push' || (github.event_name == 'pull_request' && github.event.action != 'closed')
++    runs-on: ubuntu-latest
++    name: Build and Deploy Job
++    permissions:
++       id-token: write
++       contents: read
++    steps:
++      - uses: actions/checkout@v3
++        with:
++          submodules: true
++          lfs: false
++      - name: Install OIDC Client from Core Package
++        run: npm install @actions/core@1.6.0 @actions/http-client
++      - name: Get Id Token
++        uses: actions/github-script@v6
++        id: idtoken
++        with:
++           script: |
++               const coredemo = require('@actions/core')
++               return await coredemo.getIDToken()
++           result-encoding: string
++      - name: Build And Deploy
++        id: builddeploy
++        uses: Azure/static-web-apps-deploy@v1
++        with:
++          azure_static_web_apps_api_token: ${{ secrets.AZURE_STATIC_WEB_APPS_API_TOKEN_NICE_BEACH_04D8A7A10 }}
++          action: "upload"
++          ###### Repository/Build Configurations - These values can be configured to match your app requirements. ######
++          # For more information regarding Static Web App workflow configurations, please visit: https://aka.ms/swaworkflowconfig
++          app_location: "./app" # App source code path
++          api_location: "" # Api source code path - optional
++          output_location: "dist" # Built app content directory - optional
++          github_id_token: ${{ steps.idtoken.outputs.result }}
++          ###### End of Repository/Build Configurations ######
++
++  close_pull_request_job:
++    if: github.event_name == 'pull_request' && github.event.action == 'closed'
++    runs-on: ubuntu-latest
++    name: Close Pull Request Job
++    steps:
++      - name: Close Pull Request
++        id: closepullrequest
++        uses: Azure/static-web-apps-deploy@v1
++        with:
++          action: "close"
+diff --git a/api/Dockerfile b/api/Dockerfile
+index 7a22913..5858e45 100644
+--- a/api/Dockerfile
++++ b/api/Dockerfile
+@@ -5,6 +5,7 @@ COPY package*.json ./
+ RUN npm ci
+ COPY tsconfig.json ./
+ COPY src ./src
++COPY scripts ./scripts
+ RUN npm run build
+ 
+ # ---- runtime stage ----
+diff --git a/api/package-lock.json b/api/package-lock.json
+index 16976a3..9fb9e6d 100644
+--- a/api/package-lock.json
++++ b/api/package-lock.json
+@@ -1223,9 +1223,6 @@
+         "arm"
+       ],
+       "dev": true,
+-      "libc": [
+-        "glibc"
+-      ],
+       "license": "MIT",
+       "optional": true,
+       "os": [
+@@ -1240,9 +1237,6 @@
+         "arm"
+       ],
+       "dev": true,
+-      "libc": [
+-        "musl"
+-      ],
+       "license": "MIT",
+       "optional": true,
+       "os": [
+@@ -1257,9 +1251,6 @@
+         "arm64"
+       ],
+       "dev": true,
+-      "libc": [
+-        "glibc"
+-      ],
+       "license": "MIT",
+       "optional": true,
+       "os": [
+@@ -1274,9 +1265,6 @@
+         "arm64"
+       ],
+       "dev": true,
+-      "libc": [
+-        "musl"
+-      ],
+       "license": "MIT",
+       "optional": true,
+       "os": [
+@@ -1291,9 +1279,6 @@
+         "loong64"
+       ],
+       "dev": true,
+-      "libc": [
+-        "glibc"
+-      ],
+       "license": "MIT",
+       "optional": true,
+       "os": [
+@@ -1308,9 +1293,6 @@
+         "loong64"
+       ],
+       "dev": true,
+-      "libc": [
+-        "musl"
+-      ],
+       "license": "MIT",
+       "optional": true,
+       "os": [
+@@ -1325,9 +1307,6 @@
+         "ppc64"
+       ],
+       "dev": true,
+-      "libc": [
+-        "glibc"
+-      ],
+       "license": "MIT",
+       "optional": true,
+       "os": [
+@@ -1342,9 +1321,6 @@
+         "ppc64"
+       ],
+       "dev": true,
+-      "libc": [
+-        "musl"
+-      ],
+       "license": "MIT",
+       "optional": true,
+       "os": [
+@@ -1359,9 +1335,6 @@
+         "riscv64"
+       ],
+       "dev": true,
+-      "libc": [
+-        "glibc"
+-      ],
+       "license": "MIT",
+       "optional": true,
+       "os": [
+@@ -1376,9 +1349,6 @@
+         "riscv64"
+       ],
+       "dev": true,
+-      "libc": [
+-        "musl"
+-      ],
+       "license": "MIT",
+       "optional": true,
+       "os": [
+@@ -1393,9 +1363,6 @@
+         "s390x"
+       ],
+       "dev": true,
+-      "libc": [
+-        "glibc"
+-      ],
+       "license": "MIT",
+       "optional": true,
+       "os": [
+@@ -1410,9 +1377,6 @@
+         "x64"
+       ],
+       "dev": true,
+-      "libc": [
+-        "glibc"
+-      ],
+       "license": "MIT",
+       "optional": true,
+       "os": [
+@@ -1427,9 +1391,6 @@
+         "x64"
+       ],
+       "dev": true,
+-      "libc": [
+-        "musl"
+-      ],
+       "license": "MIT",
+       "optional": true,
+       "os": [
+diff --git a/api/src/index.ts b/api/src/index.ts
+index dad70d7..176ff8a 100644
+--- a/api/src/index.ts
++++ b/api/src/index.ts
+@@ -22,7 +22,7 @@ const server = new ApolloServer<Context>({ typeDefs, resolvers });
+ await server.start();
+ 
+ app.use(
+-  '/graphql',
++  '/api/graphql',
+   cors(),
+   express.json(),
+   authMiddleware,
+diff --git a/app/.env.production b/app/.env.production
+new file mode 100644
+index 0000000..2c65763
+--- /dev/null
++++ b/app/.env.production
+@@ -0,0 +1 @@
++VITE_API_URL=/api/graphql
+diff --git a/app/staticwebapp.config.json b/app/staticwebapp.config.json
+index 7dae756..eec3884 100644
+--- a/app/staticwebapp.config.json
++++ b/app/staticwebapp.config.json
+@@ -25,13 +25,13 @@
+   },
+   "navigationFallback": {
+     "rewrite": "/index.html",
+-    "exclude": ["/api/*", "/assets/*", "*.{css,js,svg,ico,png}"]
++    "exclude": ["/api/*", "/graphql", "/assets/*", "*.{css,js,svg,ico,png}"]
+   },
+   "auth": {
+     "identityProviders": {
+       "azureActiveDirectory": {
+         "registration": {
+-          "openIdIssuer": "https://login.microsoftonline.com/<TENANT_ID>/v2.0",
++          "openIdIssuer": "https://login.microsoftonline.com/8506af0e-688d-4ab5-8fa5-c8c96d96abff/v2.0",
+           "clientIdSettingName": "AAD_CLIENT_ID",
+           "clientSecretSettingName": "AAD_CLIENT_SECRET"
+         }
