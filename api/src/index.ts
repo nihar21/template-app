@@ -22,7 +22,7 @@ const server = new ApolloServer<Context>({ typeDefs, resolvers });
 await server.start();
 
 app.use(
-  '/graphql',
+  '/api/graphql',
   cors(),
   express.json(),
   authMiddleware,
