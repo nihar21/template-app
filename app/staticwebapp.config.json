@@ -1,41 +1,7 @@
 {
   "$schema": "https://json.schemastore.org/staticwebapp.config.json",
-  "routes": [
-    {
-      "route": "/api/*",
-      "allowedRoles": ["authenticated"]
-    },
-    {
-      "route": "/admin/*",
-      "allowedRoles": ["admin"]
-    },
-    {
-      "route": "/*",
-      "allowedRoles": ["authenticated"]
-    }
-  ],
-  "responseOverrides": {
-    "401": {
-      "statusCode": 302,
-      "redirect": "/.auth/login/aad"
-    },
-    "403": {
-      "rewrite": "/forbidden.html"
-    }
-  },
   "navigationFallback": {
     "rewrite": "/index.html",
-    "exclude": ["/api/*", "/graphql", "/assets/*", "*.{css,js,svg,ico,png}"]
-  },
-  "auth": {
-    "identityProviders": {
-      "azureActiveDirectory": {
-        "registration": {
-          "openIdIssuer": "https://login.microsoftonline.com/8506af0e-688d-4ab5-8fa5-c8c96d96abff/v2.0",
-          "clientIdSettingName": "AAD_CLIENT_ID",
-          "clientSecretSettingName": "AAD_CLIENT_SECRET"
-        }
-      }
-    }
+    "exclude": ["/api/*", "/assets/*", "*.{css,js,svg,ico,png}"]
   }
 }

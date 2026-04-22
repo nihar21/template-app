@@ -2,37 +2,33 @@
 
 Starter monorepo with two independent packages:
 
-- `api/` — Node.js + TypeScript GraphQL backend (Apollo Server v4 on Express). Deploys to Azure Container Apps via the included Dockerfile.
-- `app/` — React 19 + TypeScript + Vite frontend (Tailwind v4, Apollo Client v4, React Router v7). Deploys to Azure Static Web Apps.
+- `api/` — Node.js + TypeScript GraphQL backend (Apollo Server on Express). Deploys to Azure Container Apps via the included Dockerfile.
+- `app/` — React 19 + TypeScript + Vite frontend (Tailwind v4, Apollo Client, React Router v7). Deploys to Azure Static Web Apps.
 
-Each package has its own `package.json` and is managed independently — no root `package.json`, no npm workspaces.
+Each package has its own `package.json` and is managed independently.
 
 ## Architecture
 
-Auth is handled at the SWA edge via the **Static Web Apps Linked Backend** pattern:
+Auth is handled by **MSAL** on the frontend and **Easy Auth** on the backend:
 
 ```
-Browser ──▶ SWA (Entra sign-in, session cookie)
+Browser ──▶ MSAL login (Entra ID) ──▶ acquires Bearer token
               │
-              ├── serves static app/dist
-              └── proxies /api/* ──▶ linked ACA (api/)
-                                        injects x-ms-client-principal header
+              ├── SWA serves static app/dist
+              └── GraphQL requests with Bearer token ──▶ ACA (api/)
+                    ACA Easy Auth validates token,
+                    injects x-ms-client-principal header
 ```
 
-The api does not validate JWTs or call MSAL — it only parses the `x-ms-client-principal` header injected by SWA. See `api/src/auth/middleware.ts` and `app/staticwebapp.config.json`.
+The frontend uses `@azure/msal-browser` to authenticate users and attaches Bearer tokens to every GraphQL request. ACA Easy Auth validates the token and injects the `x-ms-client-principal` header. The backend middleware (`api/src/auth/middleware.ts`) parses this header to provide user identity and roles to GraphQL resolvers.
 
 ## Prerequisites
 
 - Node.js 22+
 - npm 10+
 - Docker (only if you want to build/run the api container)
-- For full local auth: [`@azure/static-web-apps-cli`](https://azure.github.io/static-web-apps-cli/) (via `npx`, no install needed)
 
 ## Run locally
-
-### Primary flow — SWA CLI (recommended)
-
-Use this when you want the full linked-backend experience locally: SWA CLI emulates Easy Auth, injects `x-ms-client-principal`, and proxies `/api/*` to the api.
 
 Install deps once per package:
 ```
@@ -40,50 +36,45 @@ cd api && npm install && cd ..
 cd app && npm install && cd ..
 ```
 
+### With MSAL auth (recommended once Entra ID is provisioned)
+
+Fill in the MSAL env vars in `app/.env`:
+```
+VITE_CLIENT_ID=<your-entra-app-client-id>
+VITE_TENANT_ID=<your-entra-tenant-id>
+VITE_API_IDENTIFIER_URI=api://<your-client-id>
+```
+
+Add `http://localhost:5173` as a Redirect URI in your Entra ID App Registration.
+
 Then from the repo root:
 ```
-npx @azure/static-web-apps-cli start
+npm run dev
 ```
 
-This reads `swa-cli.config.json` and:
-- Starts the Vite dev server on 5173
-- Starts the api on 4000
-- Serves the unified app at **`http://localhost:4300`** with auth emulation
+This starts both the Vite dev server (`:5173`) and the api (`:4000`). MSAL will redirect to the Microsoft login page. After login, Bearer tokens are attached to all GraphQL requests automatically.
 
-Open `http://localhost:4300`. To sign in as a mock user, visit `http://localhost:4300/.auth/login/aad`. SWA CLI prompts for a userId and roles; pick any values (include `authenticated` in roles to satisfy `staticwebapp.config.json`'s `/*` rule). After submit, you'll land back in the app with the header set on every `/api/*` request.
+The backend sees no `x-ms-client-principal` header in local dev (that's only injected by ACA Easy Auth in Azure), so it falls back to a mock user context. This is safe — the mock fallback is disabled in production via `NODE_ENV=production`.
 
-Sign out: `http://localhost:4300/.auth/logout`.
+### Without auth (quick iteration)
 
-### Fallback flow — standalone (no auth)
-
-Use this when iterating on just the BE or FE without wanting auth in the loop. The api sees no `x-ms-client-principal` header and falls back to a mock user (`dev-user`, roles `['authenticated']`). The FE falls back to a hardcoded dev user when `/.auth/me` is unreachable.
-
-Two terminals:
-
+Leave the MSAL env vars empty in `app/.env`:
 ```
-# terminal 1
-cd api && npm run dev       # serves http://localhost:4000/graphql
-
-# terminal 2
-cd app && npm run dev       # serves http://localhost:5173
+VITE_CLIENT_ID=
+VITE_TENANT_ID=
+VITE_API_IDENTIFIER_URI=
 ```
 
-In `app/.env`, flip `VITE_API_URL` from `/api/graphql` to `http://localhost:4000/graphql` (the commented fallback is already in the file). Swap back when returning to the SWA CLI flow.
-
-## Role-gated routes
-
-Routes are protected at the SWA edge via `app/staticwebapp.config.json`. The config ships with a working example:
-
-```json
-{ "route": "/admin/*", "allowedRoles": ["admin"] }
+Run:
+```
+npm run dev
 ```
 
-SWA enforces this before the request reaches either the FE or api. To also hide UI elements by role, read `useCurrentUser()` from `app/src/auth/useCurrentUser.ts`:
+Auth is automatically bypassed on both sides:
+- **Frontend**: `ProtectedRoute` passes through without redirecting to login. Displays "Signed in as Local Dev".
+- **Backend**: Falls back to a mock user (`dev-user`, roles `['authenticated']`).
 
-```tsx
-const { roles } = useCurrentUser();
-{roles.includes('admin') && <AdminLink />}
-```
+No tokens are needed. This is controlled by the `AUTH_ENABLED` build-time flag in `app/src/config/constants.ts`, which is `false` when `VITE_CLIENT_ID` and `VITE_TENANT_ID` are empty.
 
 ## Scripts
 
@@ -100,14 +91,17 @@ Both packages expose:
 - `docker-build` / `docker-run` — container image build/run
 - `postbuild` — copies `schema.graphql` into `dist/` (runs automatically)
 
+Root:
+
+- `npm run dev` — starts both frontend and backend concurrently
+
 ## Project layout
 
 ```
 TemplateApp/
-├── swa-cli.config.json          # SWA CLI dev coordinator
 ├── api/
 │   ├── Dockerfile               # multi-stage, node:22-alpine
-│   ├── scripts/copy-assets.mjs  # postbuild: schema.graphql → dist/
+│   ├── scripts/copy-assets.mjs  # postbuild: schema.graphql -> dist/
 │   ├── src/
 │   │   ├── auth/middleware.ts   # parses x-ms-client-principal
 │   │   ├── graphql/
@@ -116,19 +110,21 @@ TemplateApp/
 │   │   └── index.ts             # Apollo + Express bootstrap
 │   └── test/resolvers.test.ts
 └── app/
-    ├── staticwebapp.config.json # SWA routing + auth config
+    ├── staticwebapp.config.json # SWA routing config
     ├── src/
-    │   ├── auth/useCurrentUser.ts
-    │   ├── config/constants.ts  # centralized env access
+    │   ├── auth/
+    │   │   ├── msalConfig.ts    # MSAL configuration
+    │   │   └── ProtectedRoute.tsx
+    │   ├── config/constants.ts  # centralized env access + AUTH_ENABLED flag
     │   ├── routes/              # Home, About
-    │   ├── apollo.ts
-    │   ├── App.tsx              # declarative <Routes>
+    │   ├── apollo.ts            # Apollo Client with MSAL auth link
+    │   ├── App.tsx
     │   └── main.tsx
     └── test/App.test.tsx
 ```
 
 ## Deployment notes
 
-- **FE** → Azure Static Web Apps. The deployment picks up `staticwebapp.config.json` automatically. Set app settings `AAD_CLIENT_ID` and `AAD_CLIENT_SECRET` to a registered Entra app; set `<TENANT_ID>` in the config's `openIdIssuer` URL.
-- **BE** → Azure Container Apps. Build with `npm run docker-build`. After deploy, link it to the SWA via `az staticwebapp backends link` so SWA proxies `/api/*` and injects the principal header.
+- **FE** → Azure Static Web Apps. Set `VITE_CLIENT_ID`, `VITE_TENANT_ID`, and `VITE_API_IDENTIFIER_URI` as build-time env vars. Set `AAD_CLIENT_ID` and `AAD_CLIENT_SECRET` as SWA environment variables for the custom auth provider in `staticwebapp.config.json`.
+- **BE** → Azure Container Apps. Build with `npm run docker-build` or `az acr build`. Configure ACA Easy Auth with your Entra ID App Registration. Link the ACA to SWA via the APIs menu.
 - No secrets live in this repo. `.env` files are gitignored; `.env.example` shows the shape.
